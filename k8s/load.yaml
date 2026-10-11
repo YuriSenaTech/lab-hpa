@@ -1,0 +1,39 @@
+# Gera carga por 3 minutos: 4 pods, cada um chamando o Service sem parar.
+# Use "oc create" (não "apply"): o nome é gerado a cada execução.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: load-
+spec:
+  parallelism: 4
+  completions: 4
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: load
+          image: docker.io/library/busybox:1.37
+          command:
+            - sh
+            - -c
+            - |
+              end=$(( $(date +%s) + 180 ))
+              while [ "$(date +%s)" -lt "$end" ]; do
+                wget -q -O /dev/null http://hello:8080/
+              done
+          resources:
+            requests:
+              cpu: 50m
+              memory: 16Mi
+            limits:
+              cpu: 200m
+              memory: 32Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault

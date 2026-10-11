@@ -1,0 +1,69 @@
+# Deployment + Service + Route do hello world.
+# Troque SEU_USUARIO pelo seu usuário do Docker Hub.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello
+  labels:
+    app: hello
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello
+  template:
+    metadata:
+      labels:
+        app: hello
+    spec:
+      containers:
+        - name: hello
+          image: docker.io/SEU_USUARIO/hello-hpa:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          # O HPA calcula "% de CPU" em cima do REQUEST.
+          # Request baixo = escala com pouca carga, bom pra ver acontecer.
+          resources:
+            requests:
+              cpu: 20m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello
+spec:
+  selector:
+    app: hello
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+# Route = Ingress do OpenShift. Gera uma URL pública https.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: hello
+spec:
+  to:
+    kind: Service
+    name: hello
+  port:
+    targetPort: 8080
+  tls:
+    termination: edge

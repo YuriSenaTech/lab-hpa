@@ -1,0 +1,45 @@
+# Testa sempre; publica no Docker Hub só na main.
+# Precisa no repo: variável DOCKERHUB_USERNAME e secret DOCKERHUB_TOKEN
+# (Settings → Secrets and variables → Actions).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: app/go.mod
+      - run: go vet ./...
+      - run: go test ./...
+
+  publish:
+    needs: test
+    # Sem a variável configurada, só pula (em vez de falhar).
+    if: github.event_name == 'push' && vars.DOCKERHUB_USERNAME != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: app
+          push: true
+          tags: |
+            docker.io/${{ vars.DOCKERHUB_USERNAME }}/hello-hpa:latest
+            docker.io/${{ vars.DOCKERHUB_USERNAME }}/hello-hpa:sha-${{ github.sha }}
